@@ -58,8 +58,7 @@
                     <h3 class="text-xl font-bold text-white">Eberardos Community</h3>
                     <p id="statusText" class="text-sm text-green-400 transition-colors">Terhubung</p>
                 </div>
-            </header>
-            <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-4 messages-container"></div>
+            </header            <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-4 messages-container"></div>
             <footer class="p-4 bg-[#111827] border-t border-[#1f2937] shrink-0">
                 <div class="flex items-center gap-3">
                     <input type="file" id="fileInput" class="hidden" accept="image/*,video/*">
@@ -246,5 +245,4 @@
         document.getElementById('sendButton').addEventListener('click', sendMessage);
         messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
         attachFileButton.addEventListener('click', () => fileInput.click());
-        fileInput.addEventListener('change', handleFileUp
-</html>
+        
