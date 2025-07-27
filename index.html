@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Eberardos Room Chat | Modern Edition</title>
+    <link rel="icon" href="https://qu.ax/lElwH.jpg" type="image/jpeg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        html, body { height: 100%; overflow: hidden; font-family: 'Inter', sans-serif; background-color: #030712; color: #f9fafb; }
+        .messages-container::-webkit-scrollbar { width: 8px; }
+        .messages-container::-webkit-scrollbar-track { background: transparent; }
+        .messages-container::-webkit-scrollbar-thumb { background: #374151; border-radius: 10px; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        @keyframes slideInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        .slide-in-up { animation: slideInUp 0.5s ease-out forwards; }
+    </style>
+</head>
+<body class="h-screen flex items-center justify-center">
+
+    <div id="login-screen" class="w-full max-w-md p-8 space-y-8 bg-[#111827] rounded-2xl shadow-2xl text-center fade-in">
+        <div>
+            <img class="mx-auto h-20 w-auto rounded-full" src="https://qu.ax/lElwH.jpg" alt="Logo">
+            <h2 class="mt-6 text-3xl font-bold tracking-tight text-white">Selamat Datang</h2>
+            <p class="mt-2 text-sm text-gray-400">Masuk untuk bergabung dengan komunitas.</p>
+        </div>
+        <div class="space-y-4">
+            <button id="login-google" class="w-full flex items-center justify-center gap-3 py-3 px-4 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors duration-300">
+                <i class="fab fa-google"></i> Masuk dengan Google
+            </button>
+            <button id="login-github" class="w-full flex items-center justify-center gap-3 py-3 px-4 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors duration-300">
+                <i class="fab fa-github"></i> Masuk dengan GitHub
+            </button>
+        </div>
+    </div>
+
+    <div id="app-container" class="flex h-full w-full" style="display: none;">
+        <aside class="w-20 lg:w-72 bg-[#111827] p-3 flex flex-col border-r border-[#1f2937] transition-all duration-300">
+            <div class="flex items-center gap-3 mb-6 shrink-0">
+                <img id="user-photo-sidebar" class="h-12 w-12 rounded-full" src="" alt="User">
+                <div class="hidden lg:block">
+                    <p id="user-name-sidebar" class="font-bold text-white truncate"></p>
+                    <button id="logout-button" class="text-xs text-red-400 hover:underline">Keluar</button>
+                </div>
+            </div>
+            <div class="flex-1 overflow-y-auto">
+                <h3 class="hidden lg:block text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">Online</h3>
+                <div id="onlineUsers" class="space-y-2"></div>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col bg-[#030712]">
+            <header class="p-4 bg-[#111827] border-b border-[#1f2937] flex items-center justify-between shadow-md shrink-0">
+                <div>
+                    <h3 class="text-xl font-bold text-white">Eberardos Community</h3>
+                    <p id="statusText" class="text-sm text-green-400 transition-colors">Terhubung</p>
+                </div>
+            </header>
+            <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-4 messages-container"></div>
+            <footer class="p-4 bg-[#111827] border-t border-[#1f2937] shrink-0">
+                <div class="flex items-center gap-3">
+                    <input type="file" id="fileInput" class="hidden" accept="image/*,video/*">
+                    <button id="attachFileButton" class="text-gray-400 hover:text-red-400 transition-colors p-2">
+                        <i id="uploadIcon" class="fas fa-paperclip text-xl"></i>
+                    </button>
+                    <input id="messageInput" type="text" placeholder="Ketik pesan..." class="flex-1 bg-[#1f2937] px-4 py-2.5 rounded-full focus:outline-none focus:ring-2 focus:ring-red-500 transition-all text-white placeholder-gray-500" />
+                    <button id="sendButton" class="bg-red-500 hover:bg-red-600 text-white font-bold w-11 h-11 rounded-full flex items-center justify-center transition-transform transform hover:scale-110 focus:outline-none">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </footer>
+        </main>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, GithubAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
+        import { getDatabase, ref as dbRef, push, onChildAdded, set, onValue, onDisconnect, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-database.js";
+        import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-storage.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyB0OGoHEPKBzt382Ra6Td0k5j54k-E",
+            authDomain: "eberardos-chat-app.firebaseapp.com",
+            projectId: "eberardos-chat-app",
+            storageBucket: "eberardos-chat-app.appspot.com",
+            messagingSenderId: "930027762891",
+            appId: "1:930027762891:web:88aec594ba3342372e1c7f"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getDatabase(app);
+        const storage = getStorage(app);
+
+        const loginScreen = document.getElementById('login-screen');
+        const appContainer = document.getElementById('app-container');
+        const messagesDiv = document.getElementById('messages');
+        const messageInput = document.getElementById('messageInput');
+        const onlineUsersDiv = document.getElementById('onlineUsers');
+        const statusText = document.getElementById('statusText');
+        const uploadIcon = document.getElementById('uploadIcon');
+        const attachFileButton = document.getElementById('attachFileButton');
+        const fileInput = document.getElementById('fileInput');
+
+        let currentUser = null;
+        let userStatusRef = null;
+
+        function getAvatarColor(name) {
+            const colors = ['bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500'];
+            if (!name) return colors[0];
+            const index = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
+            return colors[index];
+        }
+
+        function displayMessage(msg) {
+            const isCurrentUser = msg.uid === currentUser.uid;
+            const time = new Date(msg.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+            const msgDiv = document.createElement("div");
+            msgDiv.className = `flex items-start gap-3 message-${isCurrentUser ? 'sent' : 'received'}`;
+            if (isCurrentUser) msgDiv.classList.add('justify-end');
+
+            let contentHTML = '';
+            if (msg.type === 'image') {
+                contentHTML = `<img src="${msg.text}" alt="media" class="mt-1 rounded-lg max-w-xs cursor-pointer" onclick="window.open('${msg.text}', '_blank')">`;
+            } else if (msg.type === 'video') {
+                contentHTML = `<video src="${msg.text}" controls class="mt-1 rounded-lg max-w-xs"></video>`;
+            } else {
+                contentHTML = `<p class="break-words whitespace-pre-wrap">${msg.text}</p>`;
+            }
+
+            const bubbleClass = isCurrentUser ? 'bg-red-500 rounded-l-2xl rounded-t-2xl' : 'bg-[#1f2937] rounded-r-2xl rounded-t-2xl';
+            const messageHTML = `
+                <div class="flex flex-col ${isCurrentUser ? 'items-end' : 'items-start'}">
+                    <div class="${bubbleClass} p-3 max-w-lg">
+                        ${!isCurrentUser ? `<p class="font-bold text-red-400 text-sm mb-1">${msg.user}</p>` : ''}
+                        ${contentHTML}
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1 px-1">${time}</p>
+                </div>`;
+            
+            const avatarHTML = `<img src="${msg.photoURL}" alt="${msg.user}" class="w-8 h-8 rounded-full">`;
+
+            msgDiv.innerHTML = isCurrentUser ? messageHTML : avatarHTML + messageHTML;
+            messagesDiv.appendChild(msgDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function sendMessage() {
+            const text = messageInput.value.trim();
+            if (text === '' || !currentUser) return;
+            push(dbRef(db, 'chat'), {
+                uid: currentUser.uid,
+                user: currentUser.displayName,
+                photoURL: currentUser.photoURL,
+                text: text,
+                type: 'text',
+                timestamp: Date.now(),
+            });
+            messageInput.value = '';
+            messageInput.focus();
+        }
+
+        async function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file || !currentUser) return;
+
+            attachFileButton.disabled = true;
+            uploadIcon.className = "fas fa-spinner text-xl animate-spin";
+            statusText.textContent = "Mengunggah file...";
+
+            const filePath = `uploads/${Date.now()}_${file.name}`;
+            const fileStorageRef = storageRef(storage, filePath);
+
+            try {
+                await uploadBytes(fileStorageRef, file);
+                const downloadURL = await getDownloadURL(fileStorageRef);
+                push(dbRef(db, 'chat'), {
+                    uid: currentUser.uid,
+                    user: currentUser.displayName,
+                    photoURL: currentUser.photoURL,
+                    text: downloadURL,
+                    type: file.type.startsWith('image/') ? 'image' : 'video',
+                    timestamp: Date.now(),
+                });
+            } catch (error) {
+                alert("Gagal mengunggah file.");
+            } finally {
+                attachFileButton.disabled = false;
+                uploadIcon.className = "fas fa-paperclip text-xl";
+                statusText.textContent = "Terhubung";
+                e.target.value = null;
+            }
+        }
+
+        function setupChat(user) {
+            currentUser = user;
+            loginScreen.style.display = 'none';
+            appContainer.style.display = 'flex';
+            appContainer.classList.add('slide-in-up');
+
+            document.getElementById('user-photo-sidebar').src = user.photoURL;
+            document.getElementById('user-name-sidebar').textContent = user.displayName;
+
+            userStatusRef = dbRef(db, `onlineUsers/${user.uid}`);
+            set(userStatusRef, { name: user.displayName, photoURL: user.photoURL, status: 'online' });
+            onDisconnect(userStatusRef).set({ name: user.displayName, photoURL: user.photoURL, status: 'offline', lastSeen: serverTimestamp() });
+
+            onValue(dbRef(db, 'onlineUsers'), (snapshot) => {
+                const users = snapshot.val() || {};
+                onlineUsersDiv.innerHTML = Object.values(users).filter(u => u.status === 'online').map(u => `
+                    <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-[#1f2937] transition-colors cursor-pointer">
+                        <img src="${u.photoURL}" alt="${u.name}" class="w-8 h-8 rounded-full">
+                        <span class="hidden lg:inline font-medium text-sm text-gray-300">${u.name}</span>
+                    </div>
+                `).join('');
+            });
+
+            messagesDiv.innerHTML = '';
+            onChildAdded(dbRef(db, 'chat'), (snapshot) => displayMessage(snapshot.val()));
+        }
+
+        function clearChat() {
+            if (userStatusRef) set(userStatusRef, { ...currentUser, status: 'offline', lastSeen: serverTimestamp() });
+            currentUser = null;
+            userStatusRef = null;
+            messagesDiv.innerHTML = '';
+            onlineUsersDiv.innerHTML = '';
+            appContainer.style.display = 'none';
+            loginScreen.style.display = 'block';
+        }
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                setupChat(user);
+            } else {
+                clearChat();
+            }
+        });
+
+        document.getElementById('login-google').addEventListener('click', () => signInWithPopup(auth, new GoogleAuthProvider()));
+        document.getElementById('login-github').addEventListener('click', () => signInWithPopup(auth, new GithubAuthProvider()));
+        document.getElementById('logout-button').addEventListener('click', () => signOut(auth));
+        document.getElementById('sendButton').addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+        attachFileButton.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', handleFileUpload);
+    </script>
+</body>
+</html>
